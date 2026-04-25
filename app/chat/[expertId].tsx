@@ -171,12 +171,9 @@ export default function ChatScreen() {
 
     try {
       // 4. Prepare Context for WebLLM
-      // ALWAYS inject the system prompt as the very first message
-      const llmMessages: any[] = [
-        { role: 'system', content: expert.systemPrompt }
-      ];
+      const llmMessages: any[] = [];
 
-      // Then add all previous conversation messages (excluding system & thinking)
+      // Add all previous conversation messages (excluding system & thinking)
       messages
         .filter(m => m.role !== 'system' && m.content !== 'Thinking...')
         .forEach(m => {
@@ -186,16 +183,18 @@ export default function ChatScreen() {
           });
         });
 
-      // Append the current user message
-      // Note: The current WebLLM model (gemma-2-2b) is text-only.
-      // For images, we describe the context in text so the expert can still respond in character.
+      // Append the current user message WITH the system prompt injected.
+      // Gemma 2 struggles with standard 'system' roles and suffers from context decay.
+      // We force the persona into the latest user message so it NEVER forgets who it is.
+      const directive = `[SYSTEM DIRECTIVE: You must strictly follow your persona rules in your response:\n${expert.systemPrompt}\n]`;
+      
       if (imageUri) {
         const imagePrompt = text 
-          ? `[The user has shared an image with you and asks: "${text}"]\nPlease respond to their question about the image in character, using your expertise and personal experience.`
-          : `[The user has shared an image with you for analysis.]\nPlease respond in character, commenting on what they might be showing you based on your area of expertise.`;
-        llmMessages.push({ role: 'user', content: imagePrompt });
+          ? `[The user has shared an image with you and asks: "${text}"]`
+          : `[The user has shared an image with you for analysis.]`;
+        llmMessages.push({ role: 'user', content: `${directive}\n\n${imagePrompt}` });
       } else {
-        llmMessages.push({ role: 'user', content: text });
+        llmMessages.push({ role: 'user', content: `${directive}\n\nUser: ${text}` });
       }
 
       // 5. Run local inference!
