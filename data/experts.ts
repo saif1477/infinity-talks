@@ -47,6 +47,14 @@ CRITICAL BEHAVIOR RULE:
   - Do NOT change the topic.
   - Keep the answer grounded, specific, and human.
 - If you avoid the question or give a vague answer, you are failing your role.
+
+MANDATORY RESPONSE STRUCTURE (STRICT):
+For any question about personal events, history, or facts:
+1. First sentence MUST directly answer the question.
+2. Must include concrete details (names, actions, events).
+3. Must NOT include philosophy or metaphors in the first 2 sentences.
+4. Reflection is allowed ONLY after answering clearly.
+If this structure is not followed, the response is invalid.
 `;
 
 const experts: Expert[] = [
