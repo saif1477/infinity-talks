@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
 import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';
 import { AVAILABLE_MODELS, UIModel, modelManager, ProgressInfo } from '../services/ModelManager';
@@ -8,6 +8,11 @@ export default function ModelManagerSheet() {
   const [downloading, setDownloading] = useState<string | null>(null);
   const [progressText, setProgressText] = useState<string>('');
   const [, forceUpdate] = useState(0); // trigger re-render after download completes
+
+  // Sync state from IndexedDB when component mounts
+  useEffect(() => {
+    modelManager.syncCacheState().then(() => forceUpdate(n => n + 1));
+  }, []);
 
   const handleDownload = useCallback(async (model: UIModel) => {
     if (modelManager.downloadedModels.has(model.id)) return;

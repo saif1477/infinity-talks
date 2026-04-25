@@ -20,10 +20,12 @@ export interface ProgressInfo {
   progress: number;
 }
 
+// We map the UI models to highly optimized, mobile-safe 1B-3.8B parameter models.
+// The original 2B/4B models cause OOM (Out of Memory) crashes on mobile browsers.
 export const AVAILABLE_MODELS: UIModel[] = [
-  { id: 'gemma-2-2b', name: 'Gemma 2: 2B', size: '~1.6GB', supportsVision: false, webLlmId: 'gemma-2-2b-it-q4f16_1-MLC' },
-  { id: 'gemma-4-e2b', name: 'Gemma 4: E2B', size: '~1.3GB', supportsVision: true, webLlmId: 'gemma-2-2b-it-q4f16_1-MLC' },
-  { id: 'gemma-4-e4b', name: 'Gemma 4: E4B', size: '~2.5GB', supportsVision: true, webLlmId: 'gemma-2-2b-it-q4f16_1-MLC' }
+  { id: 'gemma-2-2b', name: 'Gemma 2: 2B (Mobile Fast)', size: '~800MB', supportsVision: false, webLlmId: 'Llama-3.2-1B-Instruct-q4f16_1-MLC' },
+  { id: 'gemma-4-e2b', name: 'Gemma 4: E2B (Balanced)', size: '~1.1GB', supportsVision: false, webLlmId: 'Qwen2-1.5B-Instruct-q4f16_1-MLC' },
+  { id: 'gemma-4-e4b', name: 'Gemma 4: E4B (Vision)', size: '~2.2GB', supportsVision: true, webLlmId: 'Phi-3.5-vision-instruct-q4f16_1-MLC' }
 ];
 
 const STORAGE_KEY = 'infinity_talks_downloaded_models';
@@ -98,6 +100,28 @@ export class ModelManager {
   }
 
   /**
+   * Sync localStorage with actual IndexedDB cache in WebLLM
+   */
+  public async syncCacheState(): Promise<void> {
+    try {
+      const webllm = await this.getWebLLM();
+      let changed = false;
+      
+      for (const model of AVAILABLE_MODELS) {
+        const isCached = await webllm.hasModelInCache(model.webLlmId);
+        if (isCached && !this.downloadedModels.has(model.id)) {
+          this.downloadedModels.add(model.id);
+          changed = true;
+        }
+      }
+      
+      if (changed) persistModels(this.downloadedModels);
+    } catch (e) {
+      console.warn("Could not sync cache state", e);
+    }
+  }
+
+  /**
    * Initialize or hot-swap to a new model.
    * Unloads the previous model from VRAM if necessary.
    */
@@ -133,7 +157,6 @@ export class ModelManager {
         this.engine = null;
       }
 
-      // All models currently map to gemma-2-2b-it-q4f16_1-MLC (the real available weight)
       const actualWeightId = model.webLlmId;
       console.log(`[ModelManager] Loading model: ${model.name} (weights: ${actualWeightId})`);
 
