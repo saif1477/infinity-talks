@@ -1,12 +1,12 @@
 {
   "expo": {
-    "name": "infinity-talks",
+    "name": "Infinity Talks",
     "slug": "infinity-talks",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "infinitytalks",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true
