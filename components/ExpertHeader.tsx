@@ -8,9 +8,10 @@ import { Colors, Spacing, Typography } from '../constants/theme';
 
 interface Props {
   expert: Expert;
+  onToggleMenu?: () => void;
 }
 
-export default function ExpertHeader({ expert }: Props) {
+export default function ExpertHeader({ expert, onToggleMenu }: Props) {
   return (
     <View style={styles.container}>
       <LinearGradient
@@ -21,6 +22,11 @@ export default function ExpertHeader({ expert }: Props) {
         <Pressable onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={24} color={Colors.textPrimary} />
         </Pressable>
+        {onToggleMenu && (
+          <Pressable onPress={onToggleMenu} style={styles.backBtn}>
+            <Ionicons name="menu" size={24} color={Colors.textPrimary} />
+          </Pressable>
+        )}
         <View style={styles.avatarWrap}>
           <LinearGradient colors={expert.gradient} style={styles.avatarRing}>
             <View style={styles.avatarInner}>

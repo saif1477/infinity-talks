@@ -112,6 +112,12 @@ export default function ChatInput({ accentColor, gradient, onSend }: Props) {
             onChangeText={setText}
             multiline
             maxLength={500}
+            onKeyPress={(e) => {
+              if (Platform.OS === 'web' && e.nativeEvent.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSend();
+              }
+            }}
           />
         </View>
         <Pressable onPress={handleSend} style={styles.sendBtn}>
@@ -201,7 +207,15 @@ const styles = StyleSheet.create({
     borderColor: Colors.inputBorder, paddingHorizontal: Spacing.md,
     paddingVertical: Platform.OS === 'ios' ? Spacing.sm : 0, maxHeight: 100,
   },
-  input: { ...Typography.body, color: Colors.textPrimary, maxHeight: 80, paddingVertical: Spacing.sm },
+  input: { 
+    ...Typography.body, 
+    color: Colors.textPrimary, 
+    maxHeight: 80, 
+    paddingVertical: Spacing.sm,
+    // @ts-ignore - for web
+    outlineStyle: 'none',
+    backgroundColor: 'transparent',
+  },
   sendBtn: { marginBottom: 2 },
   sendGradient: {
     width: 40, height: 40, borderRadius: 20,

@@ -40,10 +40,6 @@ export default function HomeScreen() {
     router.push(`/chat/${expert.id}`);
   };
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-  };
-
   if (loading || !session) return null;
 
   return (
@@ -79,8 +75,8 @@ export default function HomeScreen() {
             Chat with history's greatest minds
           </Animated.Text>
           
-          <Pressable style={styles.signOutButton} onPress={handleSignOut}>
-            <Ionicons name="log-out-outline" size={20} color={Colors.textSecondary} />
+          <Pressable style={styles.signOutButton} onPress={() => router.push('/profile')}>
+            <Ionicons name="person-outline" size={20} color={Colors.textSecondary} />
           </Pressable>
 
           {/* Stats bar */}

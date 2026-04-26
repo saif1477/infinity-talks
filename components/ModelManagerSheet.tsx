@@ -33,12 +33,19 @@ export default function ModelManagerSheet() {
     forceUpdate(n => n + 1); // re-render to show checkmark
   }, []);
 
+  const [isExpanded, setIsExpanded] = useState(false);
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Model Management</Text>
-      <Text style={styles.subtitle}>Download AI brains to your device for offline inference.</Text>
+      <Pressable onPress={() => setIsExpanded(!isExpanded)} style={styles.headerRow}>
+        <View>
+          <Text style={styles.title}>AI Models</Text>
+          <Text style={styles.subtitle}>Download AI brains to your device</Text>
+        </View>
+        <Ionicons name={isExpanded ? "chevron-up" : "chevron-down"} size={24} color={Colors.textSecondary} />
+      </Pressable>
 
-      {AVAILABLE_MODELS.map((model) => {
+      {isExpanded && AVAILABLE_MODELS.map((model) => {
         const isDownloaded = modelManager.downloadedModels.has(model.id);
         const isDownloading = downloading === model.id;
 
@@ -93,6 +100,11 @@ const styles = StyleSheet.create({
     ...Typography.bodySmall,
     color: Colors.textSecondary,
     marginBottom: Spacing.md,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   modelRow: {
     flexDirection: 'row',

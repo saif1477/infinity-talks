@@ -1,16 +1,17 @@
 import React, { useRef, useEffect, useState } from 'react';
 import {
-  View, StyleSheet, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator,
+  View, StyleSheet, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator, Pressable, Text, ScrollView
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { getExpertById } from '../../data/experts';
 import ExpertHeader from '../../components/ExpertHeader';
 import ChatBubble from '../../components/ChatBubble';
 import ChatInput from '../../components/ChatInput';
-import { Colors, Spacing } from '../../constants/theme';
+import { Colors, Spacing, Typography, BorderRadius } from '../../constants/theme';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { modelManager } from '../../services/ModelManager';
+import { Ionicons } from '@expo/vector-icons';
 
 export interface ChatMessage {
   id: string;
@@ -22,7 +23,6 @@ export interface ChatMessage {
   session_id?: string;
 }
 
-// Helper to generate a simple UUID v4
 function generateUUID() {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
     const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
@@ -39,8 +39,9 @@ export default function ChatScreen() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Create a new session ID when the chat screen mounts
-  const sessionId = useRef(generateUUID()).current;
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [pastSessions, setPastSessions] = useState<{ id: string, created_at: string, preview: string }[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string>(generateUUID());
 
   useEffect(() => {
     if (!session) {
@@ -48,24 +49,43 @@ export default function ChatScreen() {
       return;
     }
 
+    const loadHistory = async () => {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('session_id, created_at, content')
+        .eq('expert_id', expertId)
+        .eq('user_id', session.user.id)
+        .eq('role', 'user')
+        .order('created_at', { ascending: false });
+
+      if (!error && data) {
+        const sessionsMap = new Map();
+        data.forEach(msg => {
+          if (!sessionsMap.has(msg.session_id)) {
+            sessionsMap.set(msg.session_id, {
+              id: msg.session_id,
+              created_at: new Date(msg.created_at).toLocaleDateString(),
+              preview: msg.content.substring(0, 30) + '...'
+            });
+          }
+        });
+        setPastSessions(Array.from(sessionsMap.values()));
+      }
+    };
+
     const initChat = async () => {
-      // First, fetch messages for this specific session
-      // (Since it's a new UUID every time you open the screen, this will be empty, 
-      // giving us a "Fresh Start" each time. If you wanted to load past chats, 
-      // you would pass an existing sessionId instead of generating a new one).
+      setLoading(true);
       const { data, error } = await supabase
         .from('messages')
         .select('*')
         .eq('expert_id', expertId)
         .eq('user_id', session.user.id)
-        .eq('session_id', sessionId)
+        .eq('session_id', activeSessionId)
         .order('created_at', { ascending: true });
 
       if (!error && data && data.length > 0) {
         setMessages(data as ChatMessage[]);
       } else {
-        // New session: Inject the System Prompt
-        // Set timestamp to 1ms before current time so it's always index 0
         const systemDate = new Date();
         systemDate.setMilliseconds(systemDate.getMilliseconds() - 1);
         
@@ -74,21 +94,19 @@ export default function ChatScreen() {
           role: 'system',
           expert_id: expert?.id || '',
           user_id: session.user.id,
-          session_id: sessionId,
+          session_id: activeSessionId,
           created_at: systemDate.toISOString(),
         };
 
-        // We don't add the system message to local state so the UI doesn't flicker it
         await supabase.from('messages').insert([systemMsg]);
         
-        // Add the intro message to the UI locally (we'll save it to DB when they reply, or right now)
         const introMsg = {
           id: Math.random().toString(),
           content: expert?.introMessage || '',
           role: 'expert',
           expert_id: expert?.id || '',
           user_id: session.user.id,
-          session_id: sessionId,
+          session_id: activeSessionId,
           created_at: new Date().toISOString(),
         };
         setMessages([introMsg as ChatMessage]);
@@ -99,11 +117,11 @@ export default function ChatScreen() {
       setLoading(false);
     };
 
+    loadHistory();
     initChat();
-  }, [expertId, session]);
+  }, [expertId, session, activeSessionId]);
 
   useEffect(() => {
-    // Scroll to bottom when messages change
     if (messages.length > 0) {
       const timer = setTimeout(() => {
         flatListRef.current?.scrollToEnd({ animated: true });
@@ -112,6 +130,16 @@ export default function ChatScreen() {
     }
   }, [messages]);
 
+  const startNewChat = () => {
+    setActiveSessionId(generateUUID());
+    setIsSidebarOpen(false);
+  };
+
+  const loadSession = (sid: string) => {
+    setActiveSessionId(sid);
+    setIsSidebarOpen(false);
+  };
+
   if (!expert) {
     return <View style={styles.screen} />;
   }
@@ -119,7 +147,6 @@ export default function ChatScreen() {
   const handleSend = async (text: string, imageUri?: string) => {
     if (!session) return;
 
-    // Check if model is loaded
     if (!modelManager.isReady()) {
       const lastErr = modelManager.getLastError();
       if (lastErr) {
@@ -130,34 +157,28 @@ export default function ChatScreen() {
       return;
     }
 
-    // 1. Create a local temporary message object
     const displayContent = imageUri ? `[Image Attached]\n${text}` : text;
     
     const userMessage: ChatMessage = {
-      id: Math.random().toString(), // temp ID
+      id: Math.random().toString(),
       content: displayContent,
       role: 'user',
       expert_id: expert.id,
       created_at: new Date().toISOString(),
       user_id: session.user.id,
-      session_id: sessionId,
+      session_id: activeSessionId,
     };
 
-    // 2. Push to UI immediately (Optimistic)
     setMessages(prev => [...prev, userMessage]);
 
-    // 3. Save User Message to Supabase
-    await supabase.from('messages').insert([
-      { 
-        content: userMessage.content,
-        role: userMessage.role,
-        expert_id: userMessage.expert_id,
-        user_id: userMessage.user_id,
-        session_id: userMessage.session_id,
-      }
-    ]);
+    await supabase.from('messages').insert([{ 
+      content: userMessage.content,
+      role: userMessage.role,
+      expert_id: userMessage.expert_id,
+      user_id: userMessage.user_id,
+      session_id: userMessage.session_id,
+    }]);
 
-    // Add a temporary "Thinking" message to UI
     const thinkingId = Math.random().toString();
     setMessages(prev => [...prev, {
       id: thinkingId,
@@ -166,14 +187,11 @@ export default function ChatScreen() {
       expert_id: expert.id,
       created_at: new Date().toISOString(),
       user_id: session.user.id,
-      session_id: sessionId,
+      session_id: activeSessionId,
     } as ChatMessage]);
 
     try {
-      // 4. Prepare Context for WebLLM
       const llmMessages: any[] = [];
-
-      // Add all previous conversation messages (excluding system & thinking)
       messages
         .filter(m => m.role !== 'system' && m.content !== 'Thinking...')
         .forEach(m => {
@@ -183,9 +201,6 @@ export default function ChatScreen() {
           });
         });
 
-      // Append the current user message WITH the system prompt injected.
-      // Gemma 2 struggles with standard 'system' roles and suffers from context decay.
-      // We force the persona into the latest user message so it NEVER forgets who it is.
       const directive = `[SYSTEM DIRECTIVE: You must strictly follow your persona rules in your response:\n${expert.systemPrompt}\n]`;
       
       if (imageUri) {
@@ -197,10 +212,8 @@ export default function ChatScreen() {
         llmMessages.push({ role: 'user', content: `${directive}\n\nUser: ${text}` });
       }
 
-      // 5. Run local inference!
       const responseText = await modelManager.generateResponse(llmMessages);
 
-      // 6. Replace Thinking message with real response
       const expertResponse: ChatMessage = {
         id: Math.random().toString(),
         content: responseText,
@@ -208,12 +221,11 @@ export default function ChatScreen() {
         expert_id: expert.id,
         created_at: new Date().toISOString(),
         user_id: session.user.id,
-        session_id: sessionId,
+        session_id: activeSessionId,
       };
 
       setMessages(prev => prev.map(m => m.id === thinkingId ? expertResponse : m));
       
-      // Save to Supabase
       await supabase.from('messages').insert([{
         content: expertResponse.content,
         role: expertResponse.role,
@@ -224,14 +236,12 @@ export default function ChatScreen() {
 
     } catch (e) {
       console.error(e);
-      // Remove thinking message on error
       setMessages(prev => prev.filter(m => m.id !== thinkingId));
       alert("Inference failed. The model might still be loading or there was a WebGPU error.");
     }
   };
 
   const renderMessage = ({ item, index }: { item: ChatMessage; index: number }) => {
-    // Convert to the format expected by ChatBubble
     const bubbleMsg = {
       id: item.id,
       role: item.role as 'user' | 'expert',
@@ -241,43 +251,111 @@ export default function ChatScreen() {
     return <ChatBubble message={bubbleMsg} expert={expert} index={index} />;
   };
 
-  // UI Filtering: Hide system messages from the chat bubbles
   const displayMessages = messages.filter(m => m.role !== 'system');
 
   return (
     <View style={styles.screen}>
-      <ExpertHeader expert={expert} />
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={0}
-      >
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator color={Colors.accentPurple} size="large" />
+      <ExpertHeader expert={expert} onToggleMenu={() => setIsSidebarOpen(!isSidebarOpen)} />
+      
+      <View style={styles.mainLayout}>
+        {isSidebarOpen && (
+          <View style={styles.sidebar}>
+            <Pressable style={styles.newChatBtn} onPress={startNewChat}>
+              <Ionicons name="add" size={20} color={Colors.textPrimary} />
+              <Text style={styles.newChatText}>New Chat</Text>
+            </Pressable>
+            
+            <Text style={styles.historyTitle}>History</Text>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {pastSessions.map(sess => (
+                <Pressable 
+                  key={sess.id} 
+                  style={[styles.historyItem, activeSessionId === sess.id && styles.historyItemActive]}
+                  onPress={() => loadSession(sess.id)}
+                >
+                  <Text style={styles.historyItemDate}>{sess.created_at}</Text>
+                  <Text style={styles.historyItemPreview}>{sess.preview}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
           </View>
-        ) : (
-          <FlatList
-            ref={flatListRef}
-            data={displayMessages}
-            renderItem={renderMessage}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.messageList}
-            showsVerticalScrollIndicator={false}
-          />
         )}
-        <ChatInput 
-          accentColor={expert.color} 
-          gradient={expert.gradient} 
-          onSend={handleSend}
-        />
-      </KeyboardAvoidingView>
+
+        <KeyboardAvoidingView
+          style={styles.flex}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={0}
+        >
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator color={Colors.accentPurple} size="large" />
+            </View>
+          ) : (
+            <FlatList
+              ref={flatListRef}
+              data={displayMessages}
+              renderItem={renderMessage}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.messageList}
+              showsVerticalScrollIndicator={false}
+            />
+          )}
+          <ChatInput 
+            accentColor={expert.color} 
+            gradient={expert.gradient} 
+            onSend={handleSend}
+          />
+        </KeyboardAvoidingView>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Colors.background },
+  mainLayout: { flex: 1, flexDirection: 'row' },
+  sidebar: {
+    width: 250,
+    backgroundColor: Colors.surface,
+    borderRightWidth: 1,
+    borderRightColor: Colors.divider,
+    padding: Spacing.md,
+  },
+  newChatBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.md,
+    backgroundColor: Colors.backgroundSecondary,
+    borderRadius: BorderRadius.md,
+    marginBottom: Spacing.lg,
+  },
+  newChatText: {
+    ...Typography.body,
+    color: Colors.textPrimary,
+    marginLeft: Spacing.sm,
+  },
+  historyTitle: {
+    ...Typography.label,
+    color: Colors.textTertiary,
+    marginBottom: Spacing.sm,
+  },
+  historyItem: {
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    marginBottom: Spacing.xs,
+  },
+  historyItemActive: {
+    backgroundColor: Colors.backgroundSecondary,
+  },
+  historyItemDate: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    marginBottom: 2,
+  },
+  historyItemPreview: {
+    ...Typography.bodySmall,
+    color: Colors.textPrimary,
+  },
   flex: { flex: 1 },
   messageList: {
     paddingHorizontal: Spacing.lg,
