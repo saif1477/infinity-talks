@@ -14,9 +14,10 @@ export default function ProfileScreen() {
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
 
   React.useEffect(() => {
-    const saved = localStorage.getItem('infinity_talks_user_avatar');
-    if (saved) setUserAvatar(saved);
-  }, []);
+    if (session?.user?.user_metadata?.avatar_url) {
+      setUserAvatar(session.user.user_metadata.avatar_url);
+    }
+  }, [session]);
 
   const handleSignOut = async () => {
     if (loading) return;
@@ -32,16 +33,34 @@ export default function ProfileScreen() {
   };
 
   const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 1,
-    });
+    setLoading(true);
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.3, // Lower quality for metadata storage
+        base64: true,
+      });
 
-    if (!result.canceled && result.assets[0].uri) {
-      setUserAvatar(result.assets[0].uri);
-      localStorage.setItem('infinity_talks_user_avatar', result.assets[0].uri);
+      if (!result.canceled && result.assets[0].base64) {
+        const base64 = `data:image/jpeg;base64,${result.assets[0].base64}`;
+        
+        const { error } = await supabase.auth.updateUser({
+          data: { avatar_url: base64 }
+        });
+
+        if (!error) {
+          setUserAvatar(base64);
+        } else {
+          alert('Failed to save profile picture: ' + error.message);
+        }
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Error picking image');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -69,7 +88,7 @@ export default function ProfileScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.profileSection}>
-          <Pressable onPress={pickImage} style={styles.avatarContainer}>
+          <Pressable onPress={pickImage} style={styles.avatarContainer} disabled={loading}>
             {userAvatar ? (
               <Image source={{ uri: userAvatar }} style={styles.avatarImage} />
             ) : (
@@ -83,6 +102,11 @@ export default function ProfileScreen() {
             <View style={styles.editBadge}>
               <Ionicons name="camera" size={14} color="#FFF" />
             </View>
+            {loading && (
+              <View style={[styles.avatarImage, styles.avatarLoading]}>
+                <ActivityIndicator color="#FFF" />
+              </View>
+            )}
           </Pressable>
 
           <Text style={styles.emailText}>{session?.user?.email || 'Guest User'}</Text>
@@ -152,6 +176,14 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
+  },
+  avatarLoading: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   editBadge: {
     position: 'absolute',

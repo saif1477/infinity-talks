@@ -51,10 +51,13 @@ export default function ChatScreen() {
     // Load pinned sessions from localStorage
     const saved = localStorage.getItem('infinity_talks_pinned_sessions');
     if (saved) setPinnedSessions(JSON.parse(saved));
-    
-    const avatar = localStorage.getItem('infinity_talks_user_avatar');
-    if (avatar) setUserAvatar(avatar);
   }, []);
+
+  useEffect(() => {
+    if (session?.user?.user_metadata?.avatar_url) {
+      setUserAvatar(session.user.user_metadata.avatar_url);
+    }
+  }, [session]);
 
   useEffect(() => {
     localStorage.setItem('infinity_talks_pinned_sessions', JSON.stringify(pinnedSessions));

@@ -19,15 +19,10 @@ export default function HomeScreen() {
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
 
   useEffect(() => {
-    const checkAvatar = () => {
-      const saved = localStorage.getItem('infinity_talks_user_avatar');
-      if (saved) setUserAvatar(saved);
-    };
-    
-    checkAvatar();
-    window.addEventListener('focus', checkAvatar);
-    return () => window.removeEventListener('focus', checkAvatar);
-  }, []);
+    if (session?.user?.user_metadata?.avatar_url) {
+      setUserAvatar(session.user.user_metadata.avatar_url);
+    }
+  }, [session]);
   const titleAnim = useRef(new Animated.Value(0)).current;
   const subtitleAnim = useRef(new Animated.Value(0)).current;
 
