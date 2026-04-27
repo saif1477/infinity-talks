@@ -93,10 +93,11 @@ const styles = StyleSheet.create({
   editButton: {
     marginRight: Spacing.sm,
     padding: Spacing.xs,
-    backgroundColor: Colors.glass,
+    backgroundColor: '#2A2A2A', // Solid background
     borderRadius: BorderRadius.sm,
     borderWidth: 1,
     borderColor: Colors.glassBorder,
+    zIndex: 50,
   },
   userBubble: {
     borderRadius: BorderRadius.lg, borderBottomRightRadius: 4,

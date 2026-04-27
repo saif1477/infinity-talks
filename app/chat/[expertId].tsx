@@ -350,7 +350,6 @@ export default function ChatScreen() {
                     onMouseEnter={() => setHoveredSessionId(sess.id)}
                     onMouseLeave={() => {
                       setHoveredSessionId(null);
-                      setActiveMenuId(null);
                     }}
                   >
                     <Pressable 
@@ -490,13 +489,18 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 8,
     top: 40,
-    backgroundColor: Colors.surfaceLight,
+    backgroundColor: '#1E1E1E', // Solid dark color
     borderRadius: BorderRadius.md,
     padding: 4,
-    zIndex: 100,
+    zIndex: 1000,
     borderWidth: 1,
     borderColor: Colors.glassBorder,
-    minWidth: 100,
+    minWidth: 120,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
   },
   menuItem: {
     flexDirection: 'row',
