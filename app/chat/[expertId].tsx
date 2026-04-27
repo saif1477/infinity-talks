@@ -45,7 +45,6 @@ export default function ChatScreen() {
   const [pinnedSessions, setPinnedSessions] = useState<string[]>([]);
   const [hoveredSessionId, setHoveredSessionId] = useState<string | null>(null);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
-  const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
 
   useEffect(() => {
@@ -187,24 +186,6 @@ export default function ChatScreen() {
     }
   };
 
-  const handleUpdateMessage = async (newText: string) => {
-    if (!editingMessage || !session) return;
-
-    const { error } = await supabase
-      .from('messages')
-      .update({ content: newText })
-      .eq('id', editingMessage.id);
-
-    if (!error) {
-      setMessages(prev => prev.map(m => 
-        m.id === editingMessage.id ? { ...m, content: newText } : m
-      ));
-    } else {
-      alert("Failed to update message.");
-    }
-    setEditingMessage(null);
-  };
-
   if (!expert) {
     return <View style={styles.screen} />;
   }
@@ -322,7 +303,6 @@ export default function ChatScreen() {
         message={bubbleMsg} 
         expert={expert} 
         index={index} 
-        onEdit={() => setEditingMessage(item)} 
         userAvatar={userAvatar}
       />
     );
@@ -424,9 +404,6 @@ export default function ChatScreen() {
             accentColor={expert.color} 
             gradient={expert.gradient} 
             onSend={handleSend}
-            editingMessage={editingMessage}
-            onSaveEdit={handleUpdateMessage}
-            onCancelEdit={() => setEditingMessage(null)}
           />
         </KeyboardAvoidingView>
       </View>

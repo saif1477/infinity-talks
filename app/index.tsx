@@ -1,6 +1,6 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, Animated, Dimensions, Pressable
+  View, Text, StyleSheet, ScrollView, Animated, Dimensions, Pressable, Image
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
@@ -16,6 +16,18 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export default function HomeScreen() {
   const { session, loading } = useAuth();
+  const [userAvatar, setUserAvatar] = useState<string | null>(null);
+
+  useEffect(() => {
+    const checkAvatar = () => {
+      const saved = localStorage.getItem('infinity_talks_user_avatar');
+      if (saved) setUserAvatar(saved);
+    };
+    
+    checkAvatar();
+    window.addEventListener('focus', checkAvatar);
+    return () => window.removeEventListener('focus', checkAvatar);
+  }, []);
   const titleAnim = useRef(new Animated.Value(0)).current;
   const subtitleAnim = useRef(new Animated.Value(0)).current;
 
@@ -76,7 +88,11 @@ export default function HomeScreen() {
           </Animated.Text>
           
           <Pressable style={styles.signOutButton} onPress={() => router.push('/profile')}>
-            <Ionicons name="person-outline" size={20} color={Colors.textSecondary} />
+            {userAvatar ? (
+              <Image source={{ uri: userAvatar }} style={styles.profilePic} />
+            ) : (
+              <Ionicons name="person-outline" size={20} color={Colors.textSecondary} />
+            )}
           </Pressable>
 
           {/* Stats bar */}
@@ -164,6 +180,13 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.pill,
     borderWidth: 1,
     borderColor: Colors.glassBorder,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  profilePic: {
+    width: '100%',
+    height: '100%',
   },
   statsBar: {
     flexDirection: 'row', backgroundColor: Colors.glass,

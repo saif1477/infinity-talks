@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, Image, Animated, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Message, Expert } from '../data/experts';
@@ -9,16 +9,13 @@ interface Props {
   message: Message;
   expert: Expert;
   index: number;
-  onEdit?: (message: Message) => void;
   userAvatar?: string | null;
 }
 
-export default function ChatBubble({ message, expert, index, onEdit, userAvatar }: Props) {
+export default function ChatBubble({ message, expert, index, userAvatar }: Props) {
   const isUser = message.role === 'user';
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(isUser ? 20 : -20)).current;
-  const [isHovered, setIsHovered] = useState(false);
-  const hoverTimeout = useRef<any>(null);
 
   useEffect(() => {
     Animated.parallel([
@@ -29,68 +26,36 @@ export default function ChatBubble({ message, expert, index, onEdit, userAvatar 
         toValue: 0, duration: 350, delay: index * 100, useNativeDriver: true,
       }),
     ]).start();
-    return () => {
-      if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
-    };
   }, []);
-
-  const handleHoverIn = () => {
-    if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
-    setIsHovered(true);
-  };
-
-  const handleHoverOut = () => {
-    hoverTimeout.current = setTimeout(() => {
-      setIsHovered(false);
-    }, 200); // 200ms grace period
-  };
 
   if (isUser) {
     return (
-      <Pressable 
-        onHoverIn={handleHoverIn}
-        onHoverOut={handleHoverOut}
-        style={styles.userRowContainer}
-      >
-        <Animated.View style={[
-          styles.userRow,
-          { opacity: fadeAnim, transform: [{ translateX: slideAnim }] },
-        ]}>
-          <View style={styles.userBubbleContainer}>
-            {isHovered && onEdit && (
-              <Pressable 
-                onPress={(e) => {
-                  e.stopPropagation();
-                  onEdit(message);
-                }}
-                hitSlop={10}
-                style={styles.editButton}
-              >
-                <Ionicons name="pencil" size={14} color={Colors.textTertiary} />
-              </Pressable>
-            )}
-            <View style={styles.userBubbleWrap}>
-              <LinearGradient
-                colors={[Colors.bubbleUser, Colors.bubbleUserEnd]}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                style={styles.userBubble}
-              >
-                <Text style={styles.userText}>{message.content}</Text>
-              </LinearGradient>
-              <Text style={[styles.timestamp, styles.timestampRight]}>{message.timestamp}</Text>
-            </View>
-            <View style={styles.userAvatarWrap}>
-              {userAvatar ? (
-                <Image source={{ uri: userAvatar }} style={styles.userAvatar} />
-              ) : (
-                <View style={styles.userAvatarPlaceholder}>
-                  <Ionicons name="person" size={14} color="#FFF" />
-                </View>
-              )}
-            </View>
+      <Animated.View style={[
+        styles.userRow,
+        { opacity: fadeAnim, transform: [{ translateX: slideAnim }] },
+      ]}>
+        <View style={styles.userBubbleContainer}>
+          <View style={styles.userBubbleWrap}>
+            <LinearGradient
+              colors={[Colors.bubbleUser, Colors.bubbleUserEnd]}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={styles.userBubble}
+            >
+              <Text style={styles.userText}>{message.content}</Text>
+            </LinearGradient>
+            <Text style={[styles.timestamp, styles.timestampRight]}>{message.timestamp}</Text>
           </View>
-        </Animated.View>
-      </Pressable>
+          <View style={styles.userAvatarWrap}>
+            {userAvatar ? (
+              <Image source={{ uri: userAvatar }} style={styles.userAvatar} />
+            ) : (
+              <View style={styles.userAvatarPlaceholder}>
+                <Ionicons name="person" size={14} color="#FFF" />
+              </View>
+            )}
+          </View>
+        </View>
+      </Animated.View>
     );
   }
 
@@ -143,15 +108,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accentPurple,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  editButton: {
-    marginRight: Spacing.sm,
-    padding: Spacing.sm,
-    backgroundColor: '#2A2A2A', // Solid background
-    borderRadius: BorderRadius.sm,
-    borderWidth: 1,
-    borderColor: Colors.glassBorder,
-    zIndex: 50,
   },
   userBubble: {
     borderRadius: BorderRadius.lg, borderBottomRightRadius: 4,
