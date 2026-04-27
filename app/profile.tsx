@@ -1,15 +1,22 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, SafeAreaView, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Pressable, SafeAreaView, ScrollView, ActivityIndicator, Image } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Colors, Spacing, BorderRadius, Typography, Shadows } from '../constants/theme';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as ImagePicker from 'expo-image-picker';
 
 export default function ProfileScreen() {
   const { session } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [userAvatar, setUserAvatar] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    const saved = localStorage.getItem('infinity_talks_user_avatar');
+    if (saved) setUserAvatar(saved);
+  }, []);
 
   const handleSignOut = async () => {
     if (loading) return;
@@ -24,22 +31,19 @@ export default function ProfileScreen() {
     }
   };
 
-  const SettingItem = ({ icon, label, onPress, color = Colors.textPrimary, isLast = false }: any) => (
-    <Pressable 
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.settingItem,
-        pressed && styles.settingItemPressed,
-        isLast && { borderBottomWidth: 0 }
-      ]}
-    >
-      <View style={styles.settingIconContainer}>
-        <Ionicons name={icon} size={22} color={color} />
-      </View>
-      <Text style={[styles.settingLabel, { color }]}>{label}</Text>
-      <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
-    </Pressable>
-  );
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 1,
+    });
+
+    if (!result.canceled && result.assets[0].uri) {
+      setUserAvatar(result.assets[0].uri);
+      localStorage.setItem('infinity_talks_user_avatar', result.assets[0].uri);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -49,7 +53,7 @@ export default function ProfileScreen() {
         </Pressable>
         <Text style={styles.headerTitle}>Account</Text>
         <View style={styles.headerRight}>
-          <Pressable onPress={handleSignOut} disabled={loading}>
+          <Pressable onPress={handleSignOut} disabled={loading} style={styles.headerLogoutBtn}>
             {loading ? (
               <ActivityIndicator size="small" color={Colors.accentRed} />
             ) : (
@@ -65,58 +69,27 @@ export default function ProfileScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.profileSection}>
-          <View style={styles.avatarContainer}>
-            <LinearGradient
-              colors={Colors.gradientPrimary}
-              style={styles.avatarGradient}
-            >
-              <Ionicons name="person" size={48} color="#FFF" />
-            </LinearGradient>
+          <Pressable onPress={pickImage} style={styles.avatarContainer}>
+            {userAvatar ? (
+              <Image source={{ uri: userAvatar }} style={styles.avatarImage} />
+            ) : (
+              <LinearGradient
+                colors={Colors.gradientPrimary}
+                style={styles.avatarGradient}
+              >
+                <Ionicons name="person" size={48} color="#FFF" />
+              </LinearGradient>
+            )}
             <View style={styles.editBadge}>
               <Ionicons name="camera" size={14} color="#FFF" />
             </View>
-          </View>
+          </Pressable>
 
           <Text style={styles.emailText}>{session?.user?.email || 'Guest User'}</Text>
-          <Text style={styles.subText}>Premium Member</Text>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Preferences</Text>
-          <View style={styles.card}>
-            <SettingItem icon="notifications-outline" label="Notifications" onPress={() => {}} />
-            <SettingItem icon="shield-checkmark-outline" label="Privacy & Security" onPress={() => {}} />
-            <SettingItem icon="color-palette-outline" label="Appearance" onPress={() => {}} isLast={true} />
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Support</Text>
-          <View style={styles.card}>
-            <SettingItem icon="help-circle-outline" label="Help Center" onPress={() => {}} />
-            <SettingItem icon="document-text-outline" label="Terms of Service" onPress={() => {}} isLast={true} />
-          </View>
+          <Text style={styles.subText}>Infinity Talks Member</Text>
         </View>
 
         <View style={styles.bottomSection}>
-          <Pressable 
-            style={({ pressed }) => [
-              styles.logoutButton,
-              pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] },
-              loading && styles.logoutButtonDisabled
-            ]} 
-            onPress={handleSignOut}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color={Colors.accentRed} />
-            ) : (
-              <>
-              <Ionicons name="log-out" size={20} color="#FFF" />
-              <Text style={styles.logoutText}>Logout</Text>
-            </>
-          )}
-        </Pressable>
           <Text style={styles.versionText}>Version 1.0.0 (Gemma 4 Edition)</Text>
         </View>
       </ScrollView>
@@ -141,6 +114,10 @@ const styles = StyleSheet.create({
   backButton: {
     padding: Spacing.sm,
     marginLeft: -Spacing.sm,
+  },
+  headerLogoutBtn: {
+    padding: Spacing.sm,
+    marginRight: -Spacing.sm,
   },
   headerTitle: {
     ...Typography.h3,
@@ -170,6 +147,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     ...Shadows.glow(Colors.accentPurple),
+  },
+  avatarImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
   },
   editBadge: {
     position: 'absolute',

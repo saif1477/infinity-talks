@@ -46,11 +46,15 @@ export default function ChatScreen() {
   const [hoveredSessionId, setHoveredSessionId] = useState<string | null>(null);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
+  const [userAvatar, setUserAvatar] = useState<string | null>(null);
 
   useEffect(() => {
     // Load pinned sessions from localStorage
     const saved = localStorage.getItem('infinity_talks_pinned_sessions');
     if (saved) setPinnedSessions(JSON.parse(saved));
+    
+    const avatar = localStorage.getItem('infinity_talks_user_avatar');
+    if (avatar) setUserAvatar(avatar);
   }, []);
 
   useEffect(() => {
@@ -319,6 +323,7 @@ export default function ChatScreen() {
         expert={expert} 
         index={index} 
         onEdit={() => setEditingMessage(item)} 
+        userAvatar={userAvatar}
       />
     );
   };

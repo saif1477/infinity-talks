@@ -10,9 +10,10 @@ interface Props {
   expert: Expert;
   index: number;
   onEdit?: (message: Message) => void;
+  userAvatar?: string | null;
 }
 
-export default function ChatBubble({ message, expert, index, onEdit }: Props) {
+export default function ChatBubble({ message, expert, index, onEdit, userAvatar }: Props) {
   const isUser = message.role === 'user';
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(isUser ? 20 : -20)).current;
@@ -49,15 +50,26 @@ export default function ChatBubble({ message, expert, index, onEdit }: Props) {
                 <Ionicons name="pencil" size={14} color={Colors.textTertiary} />
               </Pressable>
             )}
-            <LinearGradient
-              colors={[Colors.bubbleUser, Colors.bubbleUserEnd]}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-              style={styles.userBubble}
-            >
-              <Text style={styles.userText}>{message.content}</Text>
-            </LinearGradient>
+            <View style={styles.userBubbleWrap}>
+              <LinearGradient
+                colors={[Colors.bubbleUser, Colors.bubbleUserEnd]}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                style={styles.userBubble}
+              >
+                <Text style={styles.userText}>{message.content}</Text>
+              </LinearGradient>
+              <Text style={[styles.timestamp, styles.timestampRight]}>{message.timestamp}</Text>
+            </View>
+            <View style={styles.userAvatarWrap}>
+              {userAvatar ? (
+                <Image source={{ uri: userAvatar }} style={styles.userAvatar} />
+              ) : (
+                <View style={styles.userAvatarPlaceholder}>
+                  <Ionicons name="person" size={14} color="#FFF" />
+                </View>
+              )}
+            </View>
           </View>
-          <Text style={[styles.timestamp, styles.timestampRight]}>{message.timestamp}</Text>
         </Animated.View>
       </Pressable>
     );
@@ -85,10 +97,33 @@ const styles = StyleSheet.create({
   userRowContainer: {
     width: '100%',
   },
-  userRow: { alignItems: 'flex-end', marginBottom: Spacing.md, paddingLeft: 48 },
+  userRow: { alignItems: 'flex-end', marginBottom: Spacing.md, paddingLeft: 12 },
   userBubbleContainer: {
     flexDirection: 'row',
+    alignItems: 'flex-end',
+  },
+  userBubbleWrap: {
+    flex: 1,
+    alignItems: 'flex-end',
+  },
+  userAvatarWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginLeft: Spacing.sm,
+    backgroundColor: Colors.surface,
+  },
+  userAvatar: {
+    width: '100%',
+    height: '100%',
+  },
+  userAvatarPlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: Colors.accentPurple,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   editButton: {
     marginRight: Spacing.sm,
