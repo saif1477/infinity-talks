@@ -356,6 +356,7 @@ export default function ChatScreen() {
                     onMouseLeave={() => {
                       setHoveredSessionId(null);
                     }}
+                    style={{ zIndex: activeMenuId === sess.id ? 1000 : 1 }}
                   >
                     <Pressable 
                       style={[styles.historyItem, activeSessionId === sess.id && styles.historyItemActive]}

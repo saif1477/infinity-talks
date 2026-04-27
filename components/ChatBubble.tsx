@@ -18,6 +18,7 @@ export default function ChatBubble({ message, expert, index, onEdit, userAvatar 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(isUser ? 20 : -20)).current;
   const [isHovered, setIsHovered] = useState(false);
+  const hoverTimeout = useRef<any>(null);
 
   useEffect(() => {
     Animated.parallel([
@@ -28,13 +29,27 @@ export default function ChatBubble({ message, expert, index, onEdit, userAvatar 
         toValue: 0, duration: 350, delay: index * 100, useNativeDriver: true,
       }),
     ]).start();
+    return () => {
+      if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
+    };
   }, []);
+
+  const handleHoverIn = () => {
+    if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
+    setIsHovered(true);
+  };
+
+  const handleHoverOut = () => {
+    hoverTimeout.current = setTimeout(() => {
+      setIsHovered(false);
+    }, 200); // 200ms grace period
+  };
 
   if (isUser) {
     return (
       <Pressable 
-        onHoverIn={() => setIsHovered(true)}
-        onHoverOut={() => setIsHovered(false)}
+        onHoverIn={handleHoverIn}
+        onHoverOut={handleHoverOut}
         style={styles.userRowContainer}
       >
         <Animated.View style={[
@@ -44,7 +59,11 @@ export default function ChatBubble({ message, expert, index, onEdit, userAvatar 
           <View style={styles.userBubbleContainer}>
             {isHovered && onEdit && (
               <Pressable 
-                onPress={() => onEdit(message)}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  onEdit(message);
+                }}
+                hitSlop={10}
                 style={styles.editButton}
               >
                 <Ionicons name="pencil" size={14} color={Colors.textTertiary} />
@@ -127,7 +146,7 @@ const styles = StyleSheet.create({
   },
   editButton: {
     marginRight: Spacing.sm,
-    padding: Spacing.xs,
+    padding: Spacing.sm,
     backgroundColor: '#2A2A2A', // Solid background
     borderRadius: BorderRadius.sm,
     borderWidth: 1,
