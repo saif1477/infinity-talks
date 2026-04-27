@@ -10,9 +10,19 @@ interface Props {
   accentColor: string;
   gradient: [string, string];
   onSend: (text: string, imageUri?: string) => void;
+  editingMessage?: any | null;
+  onSaveEdit?: (text: string) => void;
+  onCancelEdit?: () => void;
 }
 
-export default function ChatInput({ accentColor, gradient, onSend }: Props) {
+export default function ChatInput({ 
+  accentColor, 
+  gradient, 
+  onSend, 
+  editingMessage, 
+  onSaveEdit, 
+  onCancelEdit 
+}: Props) {
   const [text, setText] = useState('');
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [showModelPicker, setShowModelPicker] = useState(false);
@@ -25,9 +35,23 @@ export default function ChatInput({ accentColor, gradient, onSend }: Props) {
     if (active) setSelectedModelId(active);
   }, []);
 
+  useEffect(() => {
+    if (editingMessage) {
+      setText(editingMessage.content);
+    } else {
+      setText('');
+    }
+  }, [editingMessage]);
+
   const handleSend = () => {
     if (text.trim().length === 0 && !imageUri) return;
-    onSend(text.trim(), imageUri || undefined);
+    
+    if (editingMessage && onSaveEdit) {
+      onSaveEdit(text.trim());
+    } else {
+      onSend(text.trim(), imageUri || undefined);
+    }
+    
     setText('');
     setImageUri(null);
   };
@@ -98,15 +122,21 @@ export default function ChatInput({ accentColor, gradient, onSend }: Props) {
           )}
         </Pressable>
 
-        {/* + Image Picker */}
-        <Pressable onPress={pickImage} style={styles.iconBtn}>
-          <Ionicons name="add-circle-outline" size={28} color={Colors.textSecondary} />
-        </Pressable>
+        {/* + Image Picker / Cancel Edit */}
+        {editingMessage ? (
+          <Pressable onPress={onCancelEdit} style={styles.iconBtn}>
+            <Ionicons name="close-circle-outline" size={28} color={Colors.accentRed} />
+          </Pressable>
+        ) : (
+          <Pressable onPress={pickImage} style={styles.iconBtn}>
+            <Ionicons name="add-circle-outline" size={28} color={Colors.textSecondary} />
+          </Pressable>
+        )}
 
         <View style={styles.inputWrap}>
           <TextInput
             style={styles.input}
-            placeholder="Ask a question..."
+            placeholder={editingMessage ? "Edit message..." : "Ask a question..."}
             placeholderTextColor={Colors.textTertiary}
             value={text}
             onChangeText={setText}
@@ -122,7 +152,7 @@ export default function ChatInput({ accentColor, gradient, onSend }: Props) {
         </View>
         <Pressable onPress={handleSend} style={styles.sendBtn}>
           <LinearGradient colors={gradient} style={styles.sendGradient}>
-            <Ionicons name="arrow-up" size={20} color="#FFF" />
+            <Ionicons name={editingMessage ? "checkmark" : "arrow-up"} size={20} color="#FFF" />
           </LinearGradient>
         </Pressable>
       </View>

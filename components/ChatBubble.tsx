@@ -1,19 +1,22 @@
-import React, { useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, Image, Animated } from 'react-native';
+import React, { useRef, useEffect, useState } from 'react';
+import { View, Text, StyleSheet, Image, Animated, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Message, Expert } from '../data/experts';
 import { Colors, Spacing, BorderRadius, Typography } from '../constants/theme';
+import { Ionicons } from '@expo/vector-icons';
 
 interface Props {
   message: Message;
   expert: Expert;
   index: number;
+  onEdit?: (message: Message) => void;
 }
 
-export default function ChatBubble({ message, expert, index }: Props) {
+export default function ChatBubble({ message, expert, index, onEdit }: Props) {
   const isUser = message.role === 'user';
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(isUser ? 20 : -20)).current;
+  const [isHovered, setIsHovered] = useState(false);
 
   useEffect(() => {
     Animated.parallel([
@@ -28,19 +31,35 @@ export default function ChatBubble({ message, expert, index }: Props) {
 
   if (isUser) {
     return (
-      <Animated.View style={[
-        styles.userRow,
-        { opacity: fadeAnim, transform: [{ translateX: slideAnim }] },
-      ]}>
-        <LinearGradient
-          colors={[Colors.bubbleUser, Colors.bubbleUserEnd]}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-          style={styles.userBubble}
-        >
-          <Text style={styles.userText}>{message.content}</Text>
-        </LinearGradient>
-        <Text style={[styles.timestamp, styles.timestampRight]}>{message.timestamp}</Text>
-      </Animated.View>
+      <Pressable 
+        onHoverIn={() => setIsHovered(true)}
+        onHoverOut={() => setIsHovered(false)}
+        style={styles.userRowContainer}
+      >
+        <Animated.View style={[
+          styles.userRow,
+          { opacity: fadeAnim, transform: [{ translateX: slideAnim }] },
+        ]}>
+          <View style={styles.userBubbleContainer}>
+            {isHovered && onEdit && (
+              <Pressable 
+                onPress={() => onEdit(message)}
+                style={styles.editButton}
+              >
+                <Ionicons name="pencil" size={14} color={Colors.textTertiary} />
+              </Pressable>
+            )}
+            <LinearGradient
+              colors={[Colors.bubbleUser, Colors.bubbleUserEnd]}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={styles.userBubble}
+            >
+              <Text style={styles.userText}>{message.content}</Text>
+            </LinearGradient>
+          </View>
+          <Text style={[styles.timestamp, styles.timestampRight]}>{message.timestamp}</Text>
+        </Animated.View>
+      </Pressable>
     );
   }
 
@@ -63,7 +82,22 @@ export default function ChatBubble({ message, expert, index }: Props) {
 }
 
 const styles = StyleSheet.create({
+  userRowContainer: {
+    width: '100%',
+  },
   userRow: { alignItems: 'flex-end', marginBottom: Spacing.md, paddingLeft: 48 },
+  userBubbleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  editButton: {
+    marginRight: Spacing.sm,
+    padding: Spacing.xs,
+    backgroundColor: Colors.glass,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
+  },
   userBubble: {
     borderRadius: BorderRadius.lg, borderBottomRightRadius: 4,
     paddingHorizontal: Spacing.lg, paddingVertical: Spacing.md,

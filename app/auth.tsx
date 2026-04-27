@@ -158,7 +158,7 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     alignItems: 'center',
-    marginBottom: Spacing.huge,
+    marginBottom: Spacing.xl,
   },
   logoIcon: {
     width: 64, height: 64, borderRadius: 20,
@@ -177,7 +177,10 @@ const styles = StyleSheet.create({
   },
   form: {
     backgroundColor: Colors.surface,
-    padding: Spacing.xl,
+    padding: Spacing.lg,
+    width: '100%',
+    maxWidth: 400,
+    alignSelf: 'center',
     borderRadius: BorderRadius.xl,
     borderWidth: 1,
     borderColor: Colors.glassBorder,
@@ -203,7 +206,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   inputContainer: {
-    marginBottom: Spacing.lg,
+    marginBottom: Spacing.md,
   },
   label: {
     ...Typography.label,
@@ -218,7 +221,7 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.md,
     color: Colors.textPrimary,
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
+    paddingVertical: Spacing.sm,
   },
   button: {
     marginTop: Spacing.md,

@@ -42,6 +42,20 @@ export default function ChatScreen() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [pastSessions, setPastSessions] = useState<{ id: string, created_at: string, preview: string }[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string>(generateUUID());
+  const [pinnedSessions, setPinnedSessions] = useState<string[]>([]);
+  const [hoveredSessionId, setHoveredSessionId] = useState<string | null>(null);
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const [editingMessage, setEditingMessage] = useState<ChatMessage | null>(null);
+
+  useEffect(() => {
+    // Load pinned sessions from localStorage
+    const saved = localStorage.getItem('infinity_talks_pinned_sessions');
+    if (saved) setPinnedSessions(JSON.parse(saved));
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('infinity_talks_pinned_sessions', JSON.stringify(pinnedSessions));
+  }, [pinnedSessions]);
 
   useEffect(() => {
     if (!session) {
@@ -69,7 +83,16 @@ export default function ChatScreen() {
             });
           }
         });
-        setPastSessions(Array.from(sessionsMap.values()));
+        
+        const sortedSessions = Array.from(sessionsMap.values()).sort((a: any, b: any) => {
+          const aPinned = pinnedSessions.includes(a.id);
+          const bPinned = pinnedSessions.includes(b.id);
+          if (aPinned && !bPinned) return -1;
+          if (!aPinned && bPinned) return 1;
+          return 0;
+        });
+        
+        setPastSessions(sortedSessions);
       }
     };
 
@@ -140,6 +163,44 @@ export default function ChatScreen() {
     setIsSidebarOpen(false);
   };
 
+  const togglePinSession = (sid: string) => {
+    setPinnedSessions(prev => 
+      prev.includes(sid) ? prev.filter(id => id !== sid) : [...prev, sid]
+    );
+  };
+
+  const deleteSession = async (sid: string) => {
+    const { error } = await supabase
+      .from('messages')
+      .delete()
+      .eq('session_id', sid);
+    
+    if (!error) {
+      setPastSessions(prev => prev.filter(s => s.id !== sid));
+      if (activeSessionId === sid) {
+        startNewChat();
+      }
+    }
+  };
+
+  const handleUpdateMessage = async (newText: string) => {
+    if (!editingMessage || !session) return;
+
+    const { error } = await supabase
+      .from('messages')
+      .update({ content: newText })
+      .eq('id', editingMessage.id);
+
+    if (!error) {
+      setMessages(prev => prev.map(m => 
+        m.id === editingMessage.id ? { ...m, content: newText } : m
+      ));
+    } else {
+      alert("Failed to update message.");
+    }
+    setEditingMessage(null);
+  };
+
   if (!expert) {
     return <View style={styles.screen} />;
   }
@@ -171,13 +232,17 @@ export default function ChatScreen() {
 
     setMessages(prev => [...prev, userMessage]);
 
-    await supabase.from('messages').insert([{ 
+    const { data: insertedData, error: insertError } = await supabase.from('messages').insert([{ 
       content: userMessage.content,
       role: userMessage.role,
       expert_id: userMessage.expert_id,
       user_id: userMessage.user_id,
       session_id: userMessage.session_id,
-    }]);
+    }]).select();
+
+    if (!insertError && insertedData && insertedData[0]) {
+      setMessages(prev => prev.map(m => m.id === userMessage.id ? insertedData[0] : m));
+    }
 
     const thinkingId = Math.random().toString();
     setMessages(prev => [...prev, {
@@ -248,7 +313,14 @@ export default function ChatScreen() {
       content: item.content,
       timestamp: new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
-    return <ChatBubble message={bubbleMsg} expert={expert} index={index} />;
+    return (
+      <ChatBubble 
+        message={bubbleMsg} 
+        expert={expert} 
+        index={index} 
+        onEdit={() => setEditingMessage(item)} 
+      />
+    );
   };
 
   const displayMessages = messages.filter(m => m.role !== 'system');
@@ -267,16 +339,59 @@ export default function ChatScreen() {
             
             <Text style={styles.historyTitle}>History</Text>
             <ScrollView showsVerticalScrollIndicator={false}>
-              {pastSessions.map(sess => (
-                <Pressable 
-                  key={sess.id} 
-                  style={[styles.historyItem, activeSessionId === sess.id && styles.historyItemActive]}
-                  onPress={() => loadSession(sess.id)}
-                >
-                  <Text style={styles.historyItemDate}>{sess.created_at}</Text>
-                  <Text style={styles.historyItemPreview}>{sess.preview}</Text>
-                </Pressable>
-              ))}
+              {pastSessions.map(sess => {
+                const isPinned = pinnedSessions.includes(sess.id);
+                const isHovered = hoveredSessionId === sess.id;
+                
+                return (
+                  <View 
+                    key={sess.id}
+                    // @ts-ignore
+                    onMouseEnter={() => setHoveredSessionId(sess.id)}
+                    onMouseLeave={() => {
+                      setHoveredSessionId(null);
+                      setActiveMenuId(null);
+                    }}
+                  >
+                    <Pressable 
+                      style={[styles.historyItem, activeSessionId === sess.id && styles.historyItemActive]}
+                      onPress={() => loadSession(sess.id)}
+                    >
+                      <View style={styles.historyItemMain}>
+                        <View style={{ flex: 1 }}>
+                          <View style={styles.historyItemHeader}>
+                            {isPinned && <Ionicons name="pin" size={12} color={Colors.accentPurple} style={{ marginRight: 4 }} />}
+                            <Text style={styles.historyItemDate}>{sess.created_at}</Text>
+                          </View>
+                          <Text style={styles.historyItemPreview} numberOfLines={1}>{sess.preview}</Text>
+                        </View>
+                        
+                        {(isHovered || activeMenuId === sess.id) && (
+                          <Pressable 
+                            onPress={() => setActiveMenuId(activeMenuId === sess.id ? null : sess.id)}
+                            style={styles.kebabBtn}
+                          >
+                            <Ionicons name="ellipsis-vertical" size={16} color={Colors.textSecondary} />
+                          </Pressable>
+                        )}
+                      </View>
+                    </Pressable>
+
+                    {activeMenuId === sess.id && (
+                      <View style={styles.menuOverlay}>
+                        <Pressable style={styles.menuItem} onPress={() => { togglePinSession(sess.id); setActiveMenuId(null); }}>
+                          <Ionicons name={isPinned ? "pin-outline" : "pin"} size={16} color={Colors.textPrimary} />
+                          <Text style={styles.menuItemText}>{isPinned ? 'Unpin' : 'Pin'}</Text>
+                        </Pressable>
+                        <Pressable style={styles.menuItem} onPress={() => { deleteSession(sess.id); setActiveMenuId(null); }}>
+                          <Ionicons name="trash-outline" size={16} color={Colors.accentRed} />
+                          <Text style={[styles.menuItemText, { color: Colors.accentRed }]}>Delete</Text>
+                        </Pressable>
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
             </ScrollView>
           </View>
         )}
@@ -304,6 +419,9 @@ export default function ChatScreen() {
             accentColor={expert.color} 
             gradient={expert.gradient} 
             onSend={handleSend}
+            editingMessage={editingMessage}
+            onSaveEdit={handleUpdateMessage}
+            onCancelEdit={() => setEditingMessage(null)}
           />
         </KeyboardAvoidingView>
       </View>
@@ -347,12 +465,46 @@ const styles = StyleSheet.create({
   historyItemActive: {
     backgroundColor: Colors.backgroundSecondary,
   },
+  historyItemMain: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  historyItemHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   historyItemDate: {
     ...Typography.caption,
     color: Colors.textSecondary,
     marginBottom: 2,
   },
   historyItemPreview: {
+    ...Typography.bodySmall,
+    color: Colors.textPrimary,
+  },
+  kebabBtn: {
+    padding: 4,
+    marginLeft: 4,
+  },
+  menuOverlay: {
+    position: 'absolute',
+    right: 8,
+    top: 40,
+    backgroundColor: Colors.surfaceLight,
+    borderRadius: BorderRadius.md,
+    padding: 4,
+    zIndex: 100,
+    borderWidth: 1,
+    borderColor: Colors.glassBorder,
+    minWidth: 100,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    gap: 8,
+  },
+  menuItemText: {
     ...Typography.bodySmall,
     color: Colors.textPrimary,
   },
