@@ -39,26 +39,62 @@ export default function ProfileScreen() {
         mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
-        quality: 0.3, // Lower quality for metadata storage
-        base64: true,
+        quality: 0.8, // High quality
       });
 
-      if (!result.canceled && result.assets[0].base64) {
-        const base64 = `data:image/jpeg;base64,${result.assets[0].base64}`;
+      if (!result.canceled && result.assets[0].uri) {
+        const uri = result.assets[0].uri;
+        const userId = session?.user?.id;
+        const fileExt = 'jpg';
+        const fileName = `${userId}/${Date.now()}.${fileExt}`;
         
-        const { error } = await supabase.auth.updateUser({
-          data: { avatar_url: base64 }
+        // Convert to Blob for upload
+        const response = await fetch(uri);
+        const blob = await response.blob();
+        
+        // Check size (2MB limit)
+        if (blob.size > 2 * 1024 * 1024) {
+          alert('Image size exceeds 2MB limit.');
+          setLoading(false);
+          return;
+        }
+
+        // Upload to Supabase Storage (Assumes 'avatars' bucket exists)
+        const { data, error: uploadError } = await supabase.storage
+          .from('avatars')
+          .upload(fileName, blob, { 
+            contentType: 'image/jpeg',
+            upsert: true 
+          });
+
+        if (uploadError) {
+          console.error('Upload error:', uploadError);
+          // If error is bucket not found, guide the user
+          if (uploadError.message.includes('not found')) {
+            alert('Supabase Storage bucket "avatars" not found. Please create a public bucket named "avatars" in your Supabase dashboard.');
+          } else {
+            alert('Failed to upload image: ' + uploadError.message);
+          }
+          return;
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('avatars')
+          .getPublicUrl(fileName);
+        
+        const { error: updateError } = await supabase.auth.updateUser({
+          data: { avatar_url: publicUrl }
         });
 
-        if (!error) {
-          setUserAvatar(base64);
+        if (!updateError) {
+          setUserAvatar(publicUrl);
         } else {
-          alert('Failed to save profile picture: ' + error.message);
+          alert('Failed to update profile: ' + updateError.message);
         }
       }
     } catch (e) {
       console.error(e);
-      alert('Error picking image');
+      alert('Error picking or uploading image');
     } finally {
       setLoading(false);
     }
