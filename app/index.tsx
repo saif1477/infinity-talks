@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, Animated, Dimensions, Pressable, Image
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import ExpertCard from '../components/ExpertCard';
 import ModelManagerSheet from '../components/ModelManagerSheet';
@@ -18,11 +18,17 @@ export default function HomeScreen() {
   const { session, loading } = useAuth();
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (session?.user?.user_metadata?.avatar_url) {
-      setUserAvatar(session.user.user_metadata.avatar_url);
-    }
-  }, [session]);
+  useFocusEffect(
+    React.useCallback(() => {
+      const syncUser = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user?.user_metadata?.avatar_url) {
+          setUserAvatar(user.user_metadata.avatar_url);
+        }
+      };
+      syncUser();
+    }, [])
+  );
   const titleAnim = useRef(new Animated.Value(0)).current;
   const subtitleAnim = useRef(new Animated.Value(0)).current;
 
@@ -170,9 +176,10 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: Spacing.huge,
     right: Spacing.xl,
-    padding: Spacing.sm,
+    width: 40,
+    height: 40,
     backgroundColor: Colors.surface,
-    borderRadius: BorderRadius.pill,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: Colors.glassBorder,
     overflow: 'hidden',

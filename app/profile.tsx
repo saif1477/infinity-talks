@@ -87,6 +87,7 @@ export default function ProfileScreen() {
         });
 
         if (!updateError) {
+          await supabase.auth.refreshSession(); // Force local session update
           setUserAvatar(publicUrl);
         } else {
           alert('Failed to update profile: ' + updateError.message);
