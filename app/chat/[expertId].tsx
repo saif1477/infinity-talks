@@ -265,7 +265,7 @@ export default function ChatScreen() {
         llmMessages.push({ role: 'user', content: `${directive}\n\nUser: ${text}` });
       }
 
-      const responseText = await modelManager.generateResponse(llmMessages);
+      const responseText = await modelManager.generateResponse(llmMessages, expert.id);
 
       const expertResponse: ChatMessage = {
         id: Math.random().toString(),

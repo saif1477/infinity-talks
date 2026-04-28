@@ -193,16 +193,54 @@ export class ModelManager {
   /**
    * Generates a response using the currently loaded model.
    * Uses proper generation settings for detailed, in-character responses.
+   * Now includes RAG context injection.
    */
-  public async generateResponse(messages: any[]): Promise<string> {
+  public async generateResponse(messages: any[], expertId?: string): Promise<string> {
     if (!this.engine) {
       throw new Error("No model loaded. Please download and select a model from the ∞ menu first.");
     }
 
-    console.log(`[ModelManager] Running inference with ${messages.length} messages in context...`);
+    let finalMessages = [...messages];
+
+    // --- RAG INJECTION ---
+    if (expertId && messages.length > 0) {
+      const userQuery = messages[messages.length - 1].content;
+      try {
+        const { ragService } = await import('./RAGService');
+        const context = await ragService.getRelevantContext(expertId, userQuery);
+        
+        if (context) {
+          // Find the system message OR the directive-carrying message and inject context
+          finalMessages = finalMessages.map(msg => {
+            if (msg.content && msg.content.includes('{{context}}')) {
+              return {
+                ...msg,
+                content: msg.content.replace('{{context}}', context)
+              };
+            }
+            return msg;
+          });
+        } else {
+          // If no context found, remove the placeholder
+          finalMessages = finalMessages.map(msg => {
+            if (msg.content && msg.content.includes('{{context}}')) {
+              return {
+                ...msg,
+                content: msg.content.replace('{{context}}', 'No specific memories recalled.')
+              };
+            }
+            return msg;
+          });
+        }
+      } catch (e) {
+        console.warn("[ModelManager] RAG Injection failed, proceeding without context", e);
+      }
+    }
+
+    console.log(`[ModelManager] Running inference with ${finalMessages.length} messages in context...`);
 
     const reply = await this.engine.chat.completions.create({
-      messages: messages,
+      messages: finalMessages,
       max_tokens: 512,        // Allow longer, detailed responses
       temperature: 0.8,       // Creative but coherent
       top_p: 0.95,            // Diverse vocabulary
