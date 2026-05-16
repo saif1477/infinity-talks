@@ -1,7 +1,9 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 /**
  * ModelManager Service
  * Handles model downloading, hot-swapping, and inference via @mlc-ai/web-llm.
- * Uses localStorage to persist download state across page navigations.
+ * Uses AsyncStorage to persist download state across page navigations.
  * Lazy-loads the heavy web-llm library only when actually needed.
  */
 
@@ -21,31 +23,10 @@ export interface ProgressInfo {
 }
 
 export const AVAILABLE_MODELS: UIModel[] = [
-  { id: 'gemma-2-2b', name: 'Gemma 2: 2B', size: '~1.6GB', supportsVision: false, webLlmId: 'gemma-2-2b-it-q4f16_1-MLC' },
-  { id: 'gemma-4-e2b', name: 'Gemma 4: E2B', size: '~1.3GB', supportsVision: true, webLlmId: 'gemma-2-2b-it-q4f16_1-MLC' },
-  { id: 'gemma-4-e4b', name: 'Gemma 4: E4B', size: '~2.5GB', supportsVision: true, webLlmId: 'gemma-2-2b-it-q4f16_1-MLC' }
+  { id: 'gemma-2-2b', name: 'Gemma 2: 2B', size: '~1.6GB', supportsVision: false, webLlmId: 'gemma-2-2b-it-q4f16_1-MLC' }
 ];
 
 const STORAGE_KEY = 'infinity_talks_downloaded_models';
-
-// Read persisted download state from localStorage
-function getPersistedModels(): Set<ModelId> {
-  try {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) return new Set(JSON.parse(raw) as ModelId[]);
-    }
-  } catch { /* ignore */ }
-  return new Set();
-}
-
-function persistModels(models: Set<ModelId>) {
-  try {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify([...models]));
-    }
-  } catch { /* ignore */ }
-}
 
 /**
  * Check if WebGPU is available in the current browser.
@@ -76,11 +57,32 @@ export class ModelManager {
   private isLoading: boolean = false;
   private _lastError: string | null = null;
 
-  // Persisted across navigations via localStorage
-  public downloadedModels: Set<ModelId>;
+  // Persisted across navigations via AsyncStorage
+  public downloadedModels: Set<ModelId> = new Set();
+  private isLoaded: boolean = false;
 
   private constructor() {
-    this.downloadedModels = getPersistedModels();
+    this.initPersistence();
+  }
+
+  private async initPersistence() {
+    try {
+      const raw = await AsyncStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        this.downloadedModels = new Set(JSON.parse(raw) as ModelId[]);
+      }
+    } catch (e) {
+      console.error('Failed to load persisted models', e);
+    }
+    this.isLoaded = true;
+  }
+
+  private async persistModels() {
+    try {
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify([...this.downloadedModels]));
+    } catch (e) {
+      console.error('Failed to persist models', e);
+    }
   }
 
   public static getInstance(): ModelManager {
@@ -98,7 +100,7 @@ export class ModelManager {
   }
 
   /**
-   * Sync localStorage with actual IndexedDB cache in WebLLM
+   * Sync AsyncStorage with actual IndexedDB cache in WebLLM
    */
   public async syncCacheState(): Promise<void> {
     try {
@@ -113,7 +115,7 @@ export class ModelManager {
         }
       }
       
-      if (changed) persistModels(this.downloadedModels);
+      if (changed) await this.persistModels();
     } catch (e) {
       console.warn("Could not sync cache state", e);
     }
@@ -174,7 +176,7 @@ export class ModelManager {
       this.currentModelId = actualWeightId;
       this.currentUIModelId = model.id;
       this.downloadedModels.add(model.id);
-      persistModels(this.downloadedModels);
+      await this.persistModels();
 
       console.log(`[ModelManager] ✅ Model ${model.name} loaded successfully! GPU is active.`);
 

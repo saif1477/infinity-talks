@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase';
 import { Colors, Spacing, BorderRadius, Typography, Shadows } from '../constants/theme';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
+import * as Crypto from 'expo-crypto';
 
 export default function ProfileScreen() {
   const { session } = useAuth();
@@ -39,45 +40,54 @@ export default function ProfileScreen() {
         mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
-        quality: 0.8, // High quality
+        quality: 0.8,
       });
 
       if (!result.canceled && result.assets[0].uri) {
         const uri = result.assets[0].uri;
         const userId = session?.user?.id;
-        const fileExt = 'jpg';
-        const fileName = `${userId}/${Date.now()}.${fileExt}`;
         
-        // Convert to Blob for upload
+        // 1. Convert to Blob for upload and validation
         const response = await fetch(uri);
         const blob = await response.blob();
         
-        // Check size (2MB limit)
+        // 2. Strict File Type Validation
+        const allowedTypes = ['image/png', 'image/jpeg', 'image/webp'];
+        if (!allowedTypes.includes(blob.type)) {
+          alert('Invalid file type. Only PNG, JPEG, and WEBP are accepted.');
+          setLoading(false);
+          return;
+        }
+
+        // 3. Size Validation (2MB)
         if (blob.size > 2 * 1024 * 1024) {
           alert('Image size exceeds 2MB limit.');
           setLoading(false);
           return;
         }
 
-        // Upload to Supabase Storage (Assumes 'avatars' bucket exists)
+        // 4. Secure Unique Filename Generation
+        // Uses UUID and original extension to prevent path traversal and overwriting
+        const fileExt = blob.type.split('/')[1] || 'jpg';
+        const uniqueId = Crypto.randomUUID();
+        const fileName = `${userId}/${uniqueId}.${fileExt}`;
+
+        // 5. Upload to Supabase Storage
         const { data, error: uploadError } = await supabase.storage
           .from('avatars')
           .upload(fileName, blob, { 
-            contentType: 'image/jpeg',
-            upsert: true 
+            contentType: blob.type,
+            cacheControl: '3600',
+            upsert: false // Security: Prevent overwriting existing files
           });
 
         if (uploadError) {
           console.error('Upload error:', uploadError);
-          // If error is bucket not found, guide the user
-          if (uploadError.message.includes('not found')) {
-            alert('Supabase Storage bucket "avatars" not found. Please create a public bucket named "avatars" in your Supabase dashboard.');
-          } else {
-            alert('Failed to upload image: ' + uploadError.message);
-          }
+          alert('Failed to upload image: ' + uploadError.message);
           return;
         }
 
+        // 6. Get Public URL and update profile
         const { data: { publicUrl } } = supabase.storage
           .from('avatars')
           .getPublicUrl(fileName);
@@ -87,7 +97,7 @@ export default function ProfileScreen() {
         });
 
         if (!updateError) {
-          await supabase.auth.refreshSession(); // Force local session update
+          await supabase.auth.refreshSession();
           setUserAvatar(publicUrl);
         } else {
           alert('Failed to update profile: ' + updateError.message);
@@ -317,4 +327,3 @@ const styles = StyleSheet.create({
     color: Colors.textTertiary,
   },
 });
-
