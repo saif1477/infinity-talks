@@ -240,6 +240,7 @@ export class ModelManager {
     }
 
     console.log(`[ModelManager] Running inference with ${finalMessages.length} messages in context...`);
+    console.log('FINAL SYSTEM PROMPT:', finalMessages[finalMessages.length - 1]?.content);
 
     const reply = await this.engine.chat.completions.create({
       messages: finalMessages,
